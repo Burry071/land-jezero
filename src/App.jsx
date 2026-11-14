@@ -121,7 +121,10 @@ export default function App() {
               : 'Drift steady ✓',
             // BRAKE when falling too fast and the ground is closer than the
             // stopping distance plus a 20 m margin — steady red, never flashing.
-            brake: vVert > 3.5 && agl < (vVert * vVert) / (2 * NET_BRAKE) + 20,
+            // Threshold 3.0 (not the 3.5 SAFE limit) leaves margin for
+            // discrete-step overshoot and rising terrain: a player braking
+            // exactly when lit must still land SAFE.
+            brake: vVert > 3.0 && agl < (vVert * vVert) / (2 * NET_BRAKE) + 20,
           })
         }
       }
