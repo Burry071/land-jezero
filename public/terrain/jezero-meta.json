@@ -1,0 +1,27 @@
+{
+  "source": "USGS Astrogeology, Mars 2020 Terrain Relative Navigation HiRISE DTM Mosaic (full mosaic file, single source)",
+  "source_url": "https://astrogeology.usgs.gov/search/map/Mars/Mars2020/JEZ_hirise_soc_006_DTM_MOLAtopography_DeltaGeoid_1m_Eqc_latTs0_lon0_blend40",
+  "doi": "10.5066/P9REJ9JN",
+  "citation": "Fergason et al. 2020, Mars 2020 Terrain Relative Navigation Flight Product Generation (LPSC 2020)",
+  "ortho_source": "HiRISE ESP_045994_1985 orthoimage (same USGS mosaic, 0.25 m/px, downsampled to ~5.9 m/px)",
+  "ortho_available": true,
+  "ortho_nodata_filled_pct": 16.1,
+  "resolution_m_per_post": 1.0,
+  "window_m": 6000,
+  "grid": 256,
+  "meters_per_sample": 23.4375,
+  "center_lon_lat": [
+    77.4509,
+    18.4446
+  ],
+  "target_name": "Octavia E. Butler Landing (Perseverance landing site)",
+  "bounds_lon_lat": [
+    77.40028818540576,
+    18.393988185405757,
+    77.50151181459425,
+    18.495211814594246
+  ],
+  "elev_min_m": -2647.7260371701727,
+  "elev_max_m": -2430.800591424936,
+  "elev_reference": "MOLA topography, Delta geoid (as delivered)"
+}
