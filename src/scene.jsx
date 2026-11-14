@@ -58,6 +58,26 @@ export function TerrainMesh({ heights, orthoUrl }) {
 }
 
 /** Target ring at the real Perseverance landing site (window centre). */
+/** Target beacon: a tall translucent gold column above the ring, so the
+ * landing zone is visible from 950 m up (the flat ring is invisible from
+ * there — confirmed in the real playtest). Static geometry, no animation.
+ * Additive blending, open-ended, depthWrite off so the terrain stays visible. */
+export function TargetBeacon({ groundY }) {
+  return (
+    <mesh position={[0, groundY + 200, 0]}>
+      <cylinderGeometry args={[15, 15, 400, 24, 1, true]} />
+      <meshBasicMaterial
+        color="#ffd166"
+        transparent
+        opacity={0.15}
+        side={THREE.DoubleSide}
+        depthWrite={false}
+        blending={THREE.AdditiveBlending}
+      />
+    </mesh>
+  )
+}
+
 export function TargetRing({ groundY }) {
   return (
     <group position={[0, groundY + 2, 0]}>

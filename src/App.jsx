@@ -10,8 +10,8 @@ import {
   toMeshY,
   getMeta,
 } from './terrain'
-import { step, scoreTouchdown, initialState } from './physics'
-import { TerrainMesh, TargetRing, Lander, Dust, CameraRig } from './scene'
+import { step, scoreTouchdown, initialState, driftHint, timeToGround, MAIN_THRUST, MARS_G } from './physics'
+import { TerrainMesh, TargetRing, TargetBeacon, Lander, Dust, CameraRig } from './scene'
 
 // review-animations: UI easing — custom curve, sub-300ms, ease-out only.
 const EASE_OUT = 'cubic-bezier(0.23, 1, 0.32, 1)'
@@ -46,13 +46,18 @@ function usePerfMeter() {
   return perf
 }
 
+// Telemetry cell colour against its SAFE limit: ok ≤ limit, warn ≤ red, else bad.
+const cellCls = (v, ok, bad) => (v <= ok ? 'ok' : v <= bad ? 'warn' : 'bad')
+// Net braking deceleration (main thrust minus Mars gravity) for the BRAKE cue.
+const NET_BRAKE = MAIN_THRUST - MARS_G // 4.29 m/s²
+
 export default function App() {
   const [terrain, setTerrain] = useState(null)
   const [ortho, setOrtho] = useState(null)
   const [loadError, setLoadError] = useState(null)
   const [phase, setPhase] = useState('intro') // intro | flying | done
   const [result, setResult] = useState(null)
-  const [hud, setHud] = useState({ agl: 0, vVert: 0, vHoriz: 0, fuel: 100, dist: 0, slope: 0 })
+  const [hud, setHud] = useState({ agl: 0, vVert: 0, vHoriz: 0, fuel: 100, dist: 0, slope: 0, hint: '', brake: false })
   // The flight sim lives in a ref, never in React state: 60 Hz without re-renders.
   const simRef = useRef(null)
   const inputRef = useRef({ main: 0, left: false, right: false, forward: false, back: false })
@@ -101,13 +106,22 @@ export default function App() {
         hudTimer = 0
         const s = simRef.current
         if (s) {
+          const agl = Math.max(0, s.y - groundHeight(s.x, s.z))
+          const vVert = -s.vy
+          const hints = driftHint(s.vx, s.vz, s.x, s.z, timeToGround(agl, s.vy))
           setHud({
-            agl: Math.max(0, s.y - groundHeight(s.x, s.z)),
-            vVert: -s.vy,
+            agl,
+            vVert,
             vHoriz: Math.hypot(s.vx, s.vz),
             fuel: s.fuel,
             dist: Math.hypot(s.x, s.z),
             slope: groundSlopeDeg(s.x, s.z),
+            hint: hints.length
+              ? [...new Set(hints.map((h) => h.text))].join(' · ')
+              : 'Drift steady ✓',
+            // BRAKE when falling too fast and the ground is closer than the
+            // stopping distance plus a 20 m margin — steady red, never flashing.
+            brake: vVert > 3.5 && agl < (vVert * vVert) / (2 * NET_BRAKE) + 20,
           })
         }
       }
@@ -122,7 +136,8 @@ export default function App() {
     const down = (e) => {
       if (e.repeat) return
       const k = e.key.toLowerCase()
-      if (k === ' ' || k === 'arrowup' || k === 'w') inputRef.current.main = 1
+      if (k === ' ' || k === 'arrowup') inputRef.current.main = 1
+      if (k === 'w') inputRef.current.forward = true
       if (k === 'arrowleft' || k === 'a') inputRef.current.left = true
       if (k === 'arrowright' || k === 'd') inputRef.current.right = true
       if (k === 'arrowdown' || k === 's') inputRef.current.back = true
@@ -132,7 +147,8 @@ export default function App() {
     }
     const up = (e) => {
       const k = e.key.toLowerCase()
-      if (k === ' ' || k === 'arrowup' || k === 'w') inputRef.current.main = 0
+      if (k === ' ' || k === 'arrowup') inputRef.current.main = 0
+      if (k === 'w') inputRef.current.forward = false
       if (k === 'arrowleft' || k === 'a') inputRef.current.left = false
       if (k === 'arrowright' || k === 'd') inputRef.current.right = false
       if (k === 'arrowdown' || k === 's') inputRef.current.back = false
@@ -180,6 +196,7 @@ export default function App() {
             <Suspense fallback={null}>
               <TerrainMesh heights={terrain.heights} orthoUrl={ortho} />
               <TargetRing groundY={toMeshY(groundHeight(0, 0))} />
+              <TargetBeacon groundY={toMeshY(groundHeight(0, 0))} />
             </Suspense>
             {phase !== 'intro' && <Lander simRef={simRef} inputRef={inputRef} />}
             <Dust burst={burst} />
@@ -218,11 +235,11 @@ export default function App() {
 
       {phase === 'flying' && (
         <div className="telemetry" role="status" aria-live="off">
-          <div className={hud.vVert > 8 ? 'warn' : ''}>
+          <div className={cellCls(hud.vVert, 3.5, 8)}>
             <span>VERT SPEED</span>
             <strong>{hud.vVert.toFixed(1)} m/s ↓</strong>
           </div>
-          <div>
+          <div className={cellCls(hud.vHoriz, 2.5, 8)}>
             <span>HORIZ SPEED</span>
             <strong>{hud.vHoriz.toFixed(1)} m/s</strong>
           </div>
@@ -230,20 +247,28 @@ export default function App() {
             <span>ALTITUDE</span>
             <strong>{hud.agl.toFixed(0)} m</strong>
           </div>
-          <div>
+          <div className={cellCls(hud.dist, 150, 300)}>
             <span>DIST TO TARGET</span>
             <strong>{hud.dist.toFixed(0)} m</strong>
           </div>
-          <div>
+          <div className={cellCls(hud.slope, 12, 25)}>
             <span>SLOPE BELOW</span>
             <strong>{hud.slope.toFixed(1)}°</strong>
           </div>
-          <div className="fuel">
+          <div className={`fuel ${hud.fuel <= 15 ? 'bad' : hud.fuel <= 30 ? 'warn' : 'ok'}`}>
             <span>FUEL</span>
             <div className="fuelbar">
               <div style={{ '--fuel': hud.fuel / 100 }} />
             </div>
             <strong>{hud.fuel.toFixed(0)}%</strong>
+          </div>
+          <div className="drift">
+            <span>DRIFT</span>
+            <strong>{hud.hint}</strong>
+          </div>
+          <div className={`brake${hud.brake ? ' on' : ''}`}>
+            <span>BRAKE</span>
+            <strong>{hud.brake ? 'HOLD THRUST' : '—'}</strong>
           </div>
         </div>
       )}
@@ -260,11 +285,15 @@ export default function App() {
             terrain data Perseverance's landing team used. Fly the lander down, kill your
             speed, and touch down inside the gold ring at Octavia E. Butler Landing.
           </p>
+          <p className="envelope">
+            Land gently: under 3.5 m/s down, under 2.5 m/s sideways, inside 150 m of the ring.
+          </p>
           <button className="cta" onClick={startDescent} autoFocus>
             Begin descent ↓
           </button>
           <p className="keys">
-            <kbd>Space</kbd> main thruster · <kbd>←</kbd> <kbd>→</kbd> steer · touch buttons work too
+            <kbd>Space</kbd> main thruster · <kbd>W</kbd> forward · <kbd>←</kbd> <kbd>→</kbd> steer ·{' '}
+            <kbd>↓</kbd> back · touch buttons work too
           </p>
         </div>
       )}

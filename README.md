@@ -47,8 +47,11 @@ No backend, no keys, no accounts. The whole game is a static site.
 - **Honesty note:** mesh heights are exaggerated ×2.5 for visibility (the real
   relief is ~200 m over 6 km — nearly flat on screen). Physics and scoring
   always use true elevations.
-- **Controls:** `Space` / `↑` main thruster (hold), `←` `→` steer, `R` retry,
-  `Enter` start — plus on-screen touch buttons (hold to thrust).
+- **Controls:** `Space` / `↑` main thruster (hold), `W` forward, `←` `→` steer,
+  `↓` back, `R` retry, `Enter` start — plus on-screen touch buttons (hold to thrust).
+  The HUD shows a live drift cue (which key kills your drift) and a BRAKE cue
+  when you are falling too fast to stop in time; a gold beacon marks the target
+  from high up.
 
 ## Data sources
 

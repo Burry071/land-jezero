@@ -66,7 +66,16 @@ body {
 .telemetry div { display: flex; justify-content: space-between; gap: 12px; font-size: 0.78rem; }
 .telemetry span { color: rgba(245, 234, 217, 0.65); letter-spacing: 0.06em; }
 .telemetry strong { color: #ffd166; font-variant-numeric: tabular-nums; }
-.telemetry .warn strong { color: #ff6b4a; }
+/* Telemetry cell colour against its SAFE limit. */
+.telemetry .ok strong { color: #9ed69e; }
+.telemetry .warn strong { color: #ffb347; }
+.telemetry .bad strong { color: #ff6b4a; }
+/* BRAKE cue: steady red while on, dim while off. No flashing (WCAG 2.3.1). */
+.telemetry .brake strong { color: rgba(245, 234, 217, 0.35); }
+.telemetry .brake.on strong { color: #ff6b4a; }
+.telemetry .drift { flex-wrap: wrap; }
+.telemetry .drift strong { font-size: 0.72rem; text-align: right; }
+.overlay .envelope { color: var(--accent); font-weight: 600; margin-bottom: 18px; }
 .telemetry .fuel { flex-wrap: wrap; }
 .fuelbar {
   flex: 1; height: 6px; border-radius: 3px; background: rgba(245, 234, 217, 0.2);

@@ -3,8 +3,8 @@
 
 export const MARS_G = 3.71 // m/s^2
 export const MAIN_THRUST = 8.0 // m/s^2 at full throttle
-export const LATERAL_THRUST = 3.0 // m/s^2 per axis
-export const FUEL_BURN_MAIN = 5.0 // % per second at full main thrust
+export const LATERAL_THRUST = 6.0 // m/s^2 per axis
+export const FUEL_BURN_MAIN = 2.0 // % per second at full main thrust
 export const FUEL_BURN_LATERAL = 1.5 // % per second per lateral axis
 
 // Safe-landing envelope (Perseverance-class margins, simplified for the game)
@@ -17,13 +17,100 @@ export function initialState() {
     x: 650,
     y: 950, // altitude ABOVE GROUND at start position (added to ground height by caller)
     z: 300,
-    vx: -26,
-    vy: -14,
-    vz: -10,
+    vx: -18,
+    vy: -10,
+    vz: -12,
     fuel: 100,
     status: 'flying', // flying | safe | hard | crashed
     time: 0,
   }
+}
+
+/**
+ * Seconds until touchdown from this altitude (`agl` m) falling at `vy`
+ * (m/s, negative = down), assuming the only sane vertical policy: free-fall
+ * until the braking zone, then full thrust while still falling too fast.
+ * Pure forward simulation of the vertical dynamics, no lateral motion.
+ */
+export function timeToGround(agl, vy) {
+  let y = agl
+  let v = vy
+  let t = 0
+  const dt = 1 / 60
+  while (y > 0 && t < 300) {
+    const stopDist = (v * v - 3.5 * 3.5) / (2 * (MAIN_THRUST - MARS_G))
+    const inBrakeZone = y <= Math.max(40, stopDist * 1.1)
+    const main = inBrakeZone && v < -3.5 ? 1 : inBrakeZone && v < -3.0 ? 0.464 : 0
+    v += (main * MAIN_THRUST - MARS_G) * dt
+    y += v * dt
+    t += dt
+  }
+  return t
+}
+
+// Drift deadband: below this per-axis speed the drift is safe to ignore
+// (two axes at the deadband stay under the SAFE.vHoriz envelope).
+export const DRIFT_DEADBAND = 1.5 // m/s per axis
+
+/**
+ * Pure drift cue. The start is 650 m east of the target, so the opening
+ * drift is not a mistake to kill — it is the ride to the target, and at
+ * the opening speeds it is too slow a ride: the lander must speed up
+ * before it can brake. A pure velocity-only cue ("kill all drift now")
+ * would strand the lander ~600 m out, so this helper takes position and
+ * time-to-ground (`tGo`, seconds — see timeToGround) and tells the
+ * player, per axis: speed up, ride, brake now, or come back after
+ * drifting past the target.
+ *
+ * Screen directions assume the chase camera in scene.jsx, which sits +x/+z
+ * of the lander and looks back at it: -x reads as screen-left, +x as
+ * screen-right, -z as away from the viewer (up-screen), +z as toward it.
+ * Stopping distance for an axis is v^2 / (2 * LATERAL_THRUST); braking
+ * starts 15 m before that, so the lander stops ~15 m short of the target.
+ *
+ * Keys: -x thrust is ←/A, +x thrust is →/D, +z thrust is ↓/S ("back"),
+ * -z thrust is W ("forward"). W is bound to forward only since the
+ * steering fix; Space/↑ stay main thrust.
+ *
+ * The z axis is deliberately quieter than x: the lander starts at z=300
+ * (target z=0), so -z drift IS the approach and is never flagged while
+ * z > 0. It only speaks when |vz| must be killed near touchdown (brake
+ * range) or the lander is drifting away / overshooting (z < 0 or +z
+ * drift) — following a cue that flagged the approach would fight it.
+ * Returns one entry per axis that needs a cue; [] when steady.
+ */
+export function driftHint(vx, vz, x, z, tGo) {
+  const hints = []
+  const stop = (v) => (v * v) / (2 * LATERAL_THRUST)
+  // negKey accelerates in the -v direction, posKey in the +v direction.
+  // For x: '←' is -x thrust, '→' is +x thrust. For z: 'W' is -z thrust
+  // (forward), '↓' is +z thrust (back). onlyBrake (z) suppresses the
+  // speed-up and glide cues, so the approach is never flagged — see doc.
+  const axis = (name, v, pos, negKey, posKey, onlyBrake) => {
+    if (Math.abs(v) <= DRIFT_DEADBAND) return
+    const toward = (pos > 0 && v < 0) || (pos < 0 && v > 0)
+    const dist = Math.abs(pos)
+    // Speed needed to reach the braking point in time: the last |v|/6 s
+    // of the flight are spent braking, not travelling. (A plain dist/tGo
+    // overstates the speed needed early and makes the cue demand more
+    // speed all flight — the lander then arrives too fast to stop.)
+    const tBrake = Math.abs(v) / LATERAL_THRUST
+    const required = (dist - stop(v) - 15) / Math.max(tGo - tBrake, 1)
+    const brakeKey = v < 0 ? posKey : negKey // key opposing the velocity
+    const goKey = v < 0 ? negKey : posKey // key in the direction of travel
+    if (!toward) {
+      hints.push({ axis: name, key: brakeKey, text: brakeKey ? `Drifting away — hold ${brakeKey}` : 'Drifting away — no key fixes this' })
+    } else if (dist <= stop(v) + 15 || tGo <= tBrake + 0.5) {
+      hints.push({ axis: name, key: brakeKey, text: brakeKey ? `Brake now — hold ${brakeKey}` : 'Brake needed — no key fixes this' })
+    } else if (!onlyBrake && Math.abs(v) < 0.8 * required) {
+      hints.push({ axis: name, key: goKey, text: goKey ? `Too slow to reach target — hold ${goKey}` : 'Too slow to reach target — no key speeds this up' })
+    } else if (!onlyBrake) {
+      hints.push({ axis: name, key: null, text: 'Gliding to target — hold nothing' })
+    }
+  }
+  axis('x', vx, x, '←', '→', false)
+  axis('z', vz, z, 'W', '↓', true)
+  return hints
 }
 
 /**
