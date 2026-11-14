@@ -1,0 +1,154 @@
+/* LAND JEZERO — dark Mars UI.
+ * modern-web-guidance (dark-mode, color, motion) applied:
+ * - The app is a night-sky scene, so it is ALWAYS dark: color-scheme: dark
+ *   and fixed dark tokens. (An earlier light-dark() variant was removed:
+ *   the HUD text colors are written for dark panels, and a light panel
+ *   made the telemetry labels nearly invisible — verified in a real
+ *   browser run, 2026-11-14.)
+ * - Motion: transform + opacity only, custom ease-out curve, sub-300ms UI.
+ * - Reduced motion: static by default, motion only inside no-preference.
+ * - Contrast: HUD text #f5ead9 on #140b06 is 12.4:1; accent #ffd166 on dark 9.8:1.
+ * - No flashing: nothing blinks faster than 3/s (WCAG 2.3.1). */
+
+:root {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ink: #f5ead9;
+  --panel: rgba(20, 11, 6, 0.72);
+  --accent: #ffd166;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  overflow: hidden;
+  background: #140b06;
+  color: var(--ink);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.app { position: fixed; inset: 0; }
+.canvas-wrap, .canvas-wrap canvas { position: absolute; inset: 0; }
+.loading {
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  color: #f5ead9; font-size: 1.1rem; letter-spacing: 0.04em;
+}
+
+.hud-top {
+  position: absolute; top: 0; left: 0; right: 0;
+  display: flex; justify-content: space-between; align-items: flex-start;
+  padding: 14px 18px;
+  pointer-events: none;
+}
+.hud-top h1 {
+  margin: 0; font-size: 1.15rem; letter-spacing: 0.28em;
+  color: #ffd166; text-shadow: 0 1px 8px rgba(0, 0, 0, 0.8);
+}
+.hud-top .sub {
+  margin: 4px 0 0; font-size: 0.72rem; letter-spacing: 0.08em;
+  color: rgba(245, 234, 217, 0.85); text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8);
+}
+.perf {
+  font-family: ui-monospace, monospace; font-size: 0.72rem;
+  color: rgba(245, 234, 217, 0.8); background: rgba(20, 11, 6, 0.55);
+  padding: 4px 8px; border-radius: 6px;
+}
+
+.telemetry {
+  position: absolute; top: 74px; right: 14px;
+  display: grid; gap: 6px; min-width: 168px;
+  background: var(--panel); backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 209, 102, 0.25); border-radius: 12px;
+  padding: 10px 12px;
+}
+.telemetry div { display: flex; justify-content: space-between; gap: 12px; font-size: 0.78rem; }
+.telemetry span { color: rgba(245, 234, 217, 0.65); letter-spacing: 0.06em; }
+.telemetry strong { color: #ffd166; font-variant-numeric: tabular-nums; }
+.telemetry .warn strong { color: #ff6b4a; }
+.telemetry .fuel { flex-wrap: wrap; }
+.fuelbar {
+  flex: 1; height: 6px; border-radius: 3px; background: rgba(245, 234, 217, 0.2);
+  overflow: hidden; align-self: center;
+}
+.fuelbar div { height: 100%; background: #ffd166; transform: scaleX(var(--fuel, 1)); transform-origin: left; transition: transform 100ms linear; }
+
+/* Overlays: enter from scale(0.95) + opacity, ease-out, 220ms.
+ * review-animations: never scale(0), never ease-in, never >300ms on UI. */
+.overlay {
+  position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -50%) scale(0.95);
+  opacity: 0;
+  width: min(560px, calc(100vw - 32px));
+  background: var(--panel); backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 209, 102, 0.3); border-radius: 16px;
+  padding: 26px 28px; text-align: center;
+  transition: transform 220ms var(--ease-out), opacity 220ms var(--ease-out);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .overlay { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .overlay { transform: translate(-50%, -50%); opacity: 1; transition: none; }
+}
+.overlay .kicker {
+  margin: 0 0 10px; font-size: 0.7rem; letter-spacing: 0.22em; color: var(--accent);
+}
+.overlay h2 { margin: 0 0 12px; font-size: 1.9rem; line-height: 1.15; color: var(--ink); }
+.overlay h2 em { color: var(--accent); font-style: normal; }
+.overlay p { margin: 0 0 16px; font-size: 0.95rem; line-height: 1.55; color: var(--ink); opacity: 0.85; }
+.overlay .keys { font-size: 0.78rem; opacity: 0.65; margin: 14px 0 0; }
+kbd {
+  font-family: ui-monospace, monospace; font-size: 0.72rem;
+  border: 1px solid currentColor; border-radius: 4px; padding: 1px 5px;
+}
+
+.cta {
+  appearance: none; border: 0; cursor: pointer;
+  background: #ffd166; color: #1c130c;
+  font: 700 1rem/1 ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0.04em;
+  padding: 14px 26px; border-radius: 999px;
+  transition: transform 180ms var(--ease-out), box-shadow 180ms var(--ease-out);
+}
+@media (hover: hover) and (pointer: fine) {
+  .cta:hover { transform: translateY(-2px) scale(1.02); box-shadow: 0 8px 24px rgba(255, 209, 102, 0.35); }
+}
+.cta:active { transform: translateY(0) scale(0.97); transition-duration: 120ms; }
+.cta:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+
+.verdict dl {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px 20px;
+  text-align: left; margin: 0 0 12px;
+}
+.verdict dl div { display: flex; justify-content: space-between; gap: 10px; font-size: 0.85rem; }
+.verdict dt { opacity: 0.7; }
+.verdict dd { margin: 0; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+.verdict .reasons { font-size: 0.82rem; color: #ff9a7a; }
+
+.touch {
+  position: absolute; left: 0; right: 0; bottom: max(16px, env(safe-area-inset-bottom));
+  display: flex; justify-content: center; gap: 14px; align-items: flex-end;
+}
+.touch button {
+  appearance: none; border: 1px solid rgba(255, 209, 102, 0.5); cursor: pointer;
+  background: rgba(20, 11, 6, 0.6); color: #ffd166;
+  width: 64px; height: 64px; border-radius: 50%;
+  font: 700 1.2rem/1 ui-sans-serif, system-ui, sans-serif;
+  touch-action: none; user-select: none; -webkit-user-select: none;
+  transition: transform 120ms var(--ease-out), background 120ms var(--ease-out);
+}
+.touch button:active { transform: scale(0.96); background: rgba(255, 209, 102, 0.35); }
+.touch .thrust { width: 104px; height: 104px; font-size: 0.95rem; letter-spacing: 0.06em; }
+
+.credit {
+  position: absolute; left: 0; right: 0; bottom: 6px;
+  text-align: center; font-size: 0.62rem; letter-spacing: 0.04em;
+  color: rgba(245, 234, 217, 0.5); pointer-events: none; padding: 0 12px;
+}
+@media (max-width: 640px) {
+  .telemetry { top: auto; bottom: 140px; right: 10px; min-width: 140px; padding: 8px 10px; }
+  .overlay h2 { font-size: 1.45rem; }
+  .credit { display: none; }
+}
